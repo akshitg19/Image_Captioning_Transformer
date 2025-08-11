@@ -1,0 +1,88 @@
+import torch
+import argparse
+import pickle
+import cv2
+import albumentations as alb
+from albumentations.pytorch import ToTensorV2
+
+from model import ImageCaptioner
+
+def generate_caption(image_path, model, vocab, context_length, transforms, device):
+    """Generates a caption for a single image."""
+    model.eval()
+    
+    # Load and transform the image
+    image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+    image = transforms(image=image)['image']
+    image = image.unsqueeze(0).to(device) # Add batch dimension
+
+    # Start with the <START> token
+    caption_indices = [vocab['<START>']]
+    
+    for _ in range(context_length - 1):
+        captions_tensor = torch.LongTensor(caption_indices).unsqueeze(0).to(device)
+        
+        with torch.no_grad():
+            predictions = model(image, captions_tensor)
+        
+        # Get the prediction for the last token
+        last_word_prediction = predictions[:, -1, :]
+        predicted_index = torch.argmax(last_word_prediction, dim=1).item()
+        
+        caption_indices.append(predicted_index)
+        
+        # Stop if we predict the <END> token
+        if predicted_index == vocab['<END>']:
+            break
+            
+    # Convert indices to words
+    itos = vocab.get_itos()
+    caption_words = [itos[idx] for idx in caption_indices]
+    
+    # Clean up the output
+    return ' '.join(caption_words[1:-1]) # Exclude <START> and <END>
+
+def main(args):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Load vocabulary
+    with open(args.vocab_path, 'rb') as f:
+        vocab = pickle.load(f)
+    
+    # Define transformations
+    transforms = alb.Compose([
+        alb.Resize(224, 224),
+        alb.Normalize(),
+        ToTensorV2()
+    ])
+
+    # Re-create the model architecture
+    model = ImageCaptioner(
+        context_length=args.context_length,
+        vocabulary_size=len(vocab),
+        num_blocks=args.num_blocks,
+        model_dim=args.model_dim,
+        num_heads=args.num_heads,
+        prob=0.1
+    ).to(device)
+
+    # Load the saved weights
+    model.load_state_dict(torch.load(args.weights_path, map_location=device))
+    
+    # Generate the caption
+    caption = generate_caption(args.image_path, model, vocab, args.context_length, transforms, device)
+    
+    print(f"Generated Caption: {caption}")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Generate a caption for an image.")
+    parser.add_argument('--image_path', type=str, required=True, help='Path to the input image.')
+    parser.add_argument('--weights_path', type=str, required=True, help='Path to the trained model weights (.pt file).')
+    parser.add_argument('--vocab_path', type=str, required=True, help='Path to the saved vocabulary (.pkl file).')
+    parser.add_argument('--context_length', type=int, default=25, help='Maximum caption length used during training.')
+    parser.add_argument('--model_dim', type=int, default=512, help='Dimension of the model.')
+    parser.add_argument('--num_blocks', type=int, default=6, help='Number of Transformer blocks.')
+    parser.add_argument('--num_heads', type=int, default=8, help='Number of attention heads.')
+    
+    args = parser.parse_args()
+    main(args)
