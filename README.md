@@ -1,6 +1,6 @@
 # Transformer-based Image Captioning Model
 
-![Demo GIF or Image](<blockquote class="imgur-embed-pub" lang="en" data-id="a/Rk8h1Bj" data-context="false" ><a href="//imgur.com/a/Rk8h1Bj"></a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>)
+
 *This project uses a pretrained EfficientNet CNN encoder and a Transformer decoder to generate descriptive captions for images.*
 
 ---
@@ -37,23 +37,46 @@ This project was developed to explore the synergy between computer vision and na
 
 Follow these steps to set up the project environment. It is recommended to use a virtual environment.
 
+### Step 1: Clone the Repository
 ```bash
-# 1. Clone the repository
+# Clone this project to your local machine
 git clone [https://github.com/your-username/image-captioning-transformer.git](https://github.com/your-username/image-captioning-transformer.git)
 cd image-captioning-transformer
+```
 
-# 2. Create and activate a virtual environment (optional but recommended)
+### Step 2: Set Up a Python Environment
+```bash
+# Create and activate a virtual environment (recommended)
 python -m venv venv
 source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-# 3. Install the required dependencies
+# Install the required dependencies from the requirements file
 pip install -r requirements.txt
-
-# 4. Download the dataset
-# Please download the Flickr8k dataset and place the `Images` folder
-# and `captions.txt` file inside a `data/` directory at the root of the project.
-# You can find the dataset on Kaggle.
 ```
+
+### Step 3: Download and Place the Dataset
+This project requires the **Flickr8k dataset**.
+
+1.  **Download the dataset from Kaggle:**
+    * [**Link to Flickr8k Dataset on Kaggle**](https://www.kaggle.com/datasets/adityajn105/flickr8k)
+    * You will need a Kaggle account to download the files.
+
+2.  **Create a `data` folder** at the root of your project directory.
+
+3.  **Unzip and organize the files.** After downloading, you will have a zip file. Unzip it and place the contents into the `data` folder so that your directory structure looks like this:
+
+    ```
+    image-captioning-transformer/
+    ├── data/
+    │   ├── Images/
+    │   │   ├── 1000268201_693b08cb0e.jpg
+    │   │   └── ... (all other images)
+    │   └── captions.txt
+    ├── src/
+    │   └── ...
+    └── README.md
+    ```
+    *Make sure the `Images` folder and the `captions.txt` file are directly inside the `data` folder.*
 
 ---
 
@@ -65,10 +88,10 @@ To train the model from scratch, run the `train.py` script from the root directo
 ```bash
 python src/train.py --data_dir ./data --epochs 10 --batch_size 32
 ```
-Model weights will be saved to `weights.pt` by default.
+Model weights will be saved to `weights.pt` and the vocabulary to `vocab.pkl` in the root directory.
 
 ### Prediction
-To generate a caption for a new image, use the `predict.py` script. You will need the vocabulary file (`vocab.pkl`) and the trained model weights.
+To generate a caption for a new image, use the `predict.py` script.
 
 ```bash
 python src/predict.py --image_path /path/to/your/image.jpg --weights_path weights.pt --vocab_path vocab.pkl
