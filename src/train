@@ -1,0 +1,88 @@
+import torch
+import torch.nn as nn
+import argparse
+from torch.utils.data import DataLoader
+import pandas as pd
+import pickle
+
+from dataset import build_vocabulary, create_dataframe, ImageCaptioningDataset
+from model import ImageCaptioner
+
+def main(args):
+    """Main training loop."""
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+
+    # --- Data Loading and Prep ---
+    caption_file = f"{args.data_dir}/captions.txt"
+    
+    print("Building vocabulary...")
+    vocab, tokenizer = build_vocabulary(caption_file)
+    with open('vocab.pkl', 'wb') as f:
+        pickle.dump(vocab, f)
+    print(f"Vocabulary built and saved to vocab.pkl. Size: {len(vocab)}")
+    
+    print("Creating DataFrame...")
+    df = create_dataframe(caption_file)
+    
+    # --- Dataset and DataLoader ---
+    dataset = ImageCaptioningDataset(df, vocab, tokenizer, args.context_length, args.data_dir, split='train')
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    
+    # --- Model, Loss, Optimizer ---
+    model = ImageCaptioner(
+        context_length=args.context_length,
+        vocabulary_size=len(vocab),
+        num_blocks=args.num_blocks,
+        model_dim=args.model_dim,
+        num_heads=args.num_heads,
+        prob=0.1
+    ).to(device)
+
+    loss_fn = nn.CrossEntropyLoss(ignore_index=vocab['<PAD>'])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+
+    # --- Training Loop ---
+    print("Starting training...")
+    for epoch in range(args.epochs):
+        model.train()
+        total_loss = 0
+        for i, (images, captions) in enumerate(dataloader):
+            images, captions = images.to(device), captions.to(device)
+            
+            optimizer.zero_grad()
+            
+            predictions = model(images, captions[:, :-1])
+            
+            B, T, V = predictions.shape
+            loss = loss_fn(predictions.reshape(B * T, V), captions[:, 1:].reshape(B * T))
+            
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0) # Clip gradients
+            optimizer.step()
+            
+            total_loss += loss.item()
+            if i > 0 and i % 100 == 0:
+                print(f"Epoch [{epoch+1}/{args.epochs}], Step [{i}/{len(dataloader)}], Loss: {loss.item():.4f}")
+        
+        avg_loss = total_loss / len(dataloader)
+        print(f"--- Epoch [{epoch+1}/{args.epochs}] finished. Average Loss: {avg_loss:.4f} ---")
+
+    # --- Save Model ---
+    torch.save(model.state_dict(), 'weights.pt')
+    print("Model weights saved to weights.pt")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Train an Image Captioning Model")
+    parser.add_argument('--data_dir', type=str, default='./data', help='Directory containing the dataset')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training')
+    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for the optimizer')
+    parser.add_argument('--context_length', type=int, default=25, help='Maximum caption length')
+    parser.add_argument('--model_dim', type=int, default=512, help='Dimension of the model')
+    parser.add_argument('--num_blocks', type=int, default=6, help='Number of Transformer blocks')
+    parser.add_argument('--num_heads', type=int, default=8, help='Number of attention heads')
+    
+    args = parser.parse_args()
+    main(args)
