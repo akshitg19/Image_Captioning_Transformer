@@ -1,0 +1,102 @@
+import torch
+from torch.utils.data import Dataset
+import pandas as pd
+from collections import Counter
+import torchtext
+from torchtext.data.utils import get_tokenizer
+import cv2
+import albumentations as alb
+from albumentations.pytorch import ToTensorV2
+import pickle
+
+def build_vocabulary(caption_file, min_freq=2):
+    """Builds a vocabulary from a caption file."""
+    with open(caption_file) as f:
+        lines = f.readlines()
+    
+    all_captions = []
+    for line in lines:
+        if '.jpg,' in line:
+            caption_text = line.split('.jpg,', 1)[1].strip()
+            all_captions.append(caption_text)
+
+    vocab_frequency = Counter()
+    word_tokenizer = get_tokenizer('basic_english')
+    for cap in all_captions:
+        vocab_frequency.update(word_tokenizer(cap))
+
+    vocab = torchtext.vocab.vocab(vocab_frequency, min_freq=min_freq)
+    vocab.insert_token('<UNKNOWN>', 0)
+    vocab.insert_token('<PAD>', 1)
+    vocab.insert_token('<START>', 2)
+    vocab.insert_token('<END>', 3)
+    vocab.set_default_index(0)
+    return vocab, word_tokenizer
+
+class ImageCaptioningDataset(Dataset):
+    """Custom Dataset for Image Captioning."""
+    def __init__(self, df, vocab, tokenizer, context_length, data_dir, split='train'):
+        self.df = df
+        self.vocab = vocab
+        self.tokenizer = tokenizer
+        self.context_length = context_length
+        self.data_dir = data_dir
+        
+        if split == 'train':
+            self.transforms = alb.Compose([
+                alb.Resize(224, 224),
+                alb.HorizontalFlip(),
+                alb.ColorJitter(),
+                alb.Normalize(),
+                ToTensorV2()
+            ])
+        else: # Validation/Test transforms
+            self.transforms = alb.Compose([
+                alb.Resize(224, 224),
+                alb.Normalize(),
+                ToTensorV2()
+            ])
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        image_filename = row['filename']
+        captions = row['captions']
+        
+        image_path = f"{self.data_dir}/Images/{image_filename}"
+        actual_image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        transformed_img = self.transforms(image=actual_image)['image']
+
+        # Choose a random caption for training
+        random_idx = torch.randint(len(captions), (1,)).item()
+        caption = captions[random_idx]
+        
+        tokens = self.tokenizer(caption)
+        integers = [self.vocab['<START>']] + [self.vocab[word] for word in tokens] + [self.vocab['<END>']]
+
+        # Pad or truncate the sequence
+        if len(integers) < self.context_length:
+            integers += [self.vocab['<PAD>']] * (self.context_length - len(integers))
+        else:
+            integers = integers[:self.context_length - 1] + [self.vocab['<END>']]
+        
+        return transformed_img, torch.tensor(integers, dtype=torch.long)
+
+def create_dataframe(caption_file):
+    """Creates a pandas DataFrame from the captions file."""
+    with open(caption_file) as f:
+        lines = f.readlines()
+    
+    captions_dict = {}
+    for line in lines:
+        if '.jpg,' in line:
+            img_name, caption = line.split('.jpg,', 1)
+            img_name += '.jpg'
+            if img_name not in captions_dict:
+                captions_dict[img_name] = []
+            captions_dict[img_name].append(caption.strip())
+            
+    df = pd.DataFrame(list(captions_dict.items()), columns=['filename', 'captions'])
+    return df
