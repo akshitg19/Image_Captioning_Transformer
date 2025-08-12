@@ -1,41 +1,35 @@
 # Transformer-based Image Captioning Model
 
+![Project Status](https://img.shields.io/badge/status-in%20progress-yellow)
+![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+![PyTorch Version](https://img.shields.io/badge/pytorch-2.0%2B-orange)
 
-*This project uses a pretrained EfficientNet CNN encoder and a Transformer decoder to generate descriptive captions for images.*
-
----
-
-## Table of Contents
-- [Project Overview](#project-overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Training](#training)
-  - [Prediction](#prediction)
-- [Model Architecture](#model-architecture)
-- [Acknowledgements](#acknowledgements)
+This repository contains my implementation of an image captioning model that combines a pretrained CNN with a Transformer decoder. I built this project to get hands-on experience with classic multi-modal architectures and to explore the synergy between computer vision and natural language processing.
 
 ---
 
-## Project Overview
+## My Goal for This Project
 
-This project is an implementation of an image captioning model that combines a Convolutional Neural Network (CNN) with a Transformer-based decoder. The goal is to take an image as input and generate a human-readable, descriptive caption. The CNN acts as an encoder to "understand" the contents of the image, and the Transformer decoder acts as a language model to generate the caption word by word.
-
-This project was developed to explore the synergy between computer vision and natural language processing and to build a deeper understanding of attention mechanisms and sequence-to-sequence models.
+My main objective was to build a complete, end-to-end pipeline for a complex task. This involved everything from data processing and building a custom PyTorch Dataset to implementing the model architecture and training loop. It was a great way to solidify my understanding of attention mechanisms and how to effectively combine different types of neural networks.
 
 ---
 
-## Features
-- **CNN Encoder:** Uses a pretrained `EfficientNet-B0` to extract powerful image features.
-- **Transformer Decoder:** Leverages a multi-head attention mechanism to generate context-aware captions.
-- **Flickr8k Dataset:** Trained on the popular Flickr8k dataset.
-- **Command-Line Interface:** Scripts for both training the model and running inference on new images.
+## My Implementation Plan & Progress
+
+Here's the roadmap I followed for this project. I'm currently working on refining the training and adding evaluation metrics.
+
+- [x] **1. CNN Encoder:** Successfully integrated a pretrained `EfficientNet-B0` to extract powerful image features.
+- [x] **2. Transformer Decoder:** Built the decoder architecture from scratch using PyTorch's `nn.TransformerDecoderLayer`.
+- [x] **3. Data Pipeline:** Created a custom `Dataset` and `DataLoader` to efficiently process the Flickr8k dataset.
+- [x] **4. Training Loop:** The initial training script is functional. My next step is to train the model to convergence and fine-tune hyperparameters.
+- [x] **5. Inference Script:** Build a clean, easy-to-use script for generating captions on new images.
+- [ ] **6. Evaluation:** Implement BLEU scores to quantitatively measure the quality of the generated captions.
 
 ---
 
 ## Installation
 
-Follow these steps to set up the project environment. It is recommended to use a virtual environment.
+Follow these steps to set up the project environment. I recommend using a virtual environment.
 
 ### Step 1: Clone the Repository
 ```bash
@@ -46,11 +40,11 @@ cd image-captioning-transformer
 
 ### Step 2: Set Up a Python Environment
 ```bash
-# Create and activate a virtual environment (recommended)
+# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-# Install the required dependencies from the requirements file
+# Install the required dependencies
 pip install -r requirements.txt
 ```
 
@@ -59,41 +53,38 @@ This project requires the **Flickr8k dataset**.
 
 1.  **Download the dataset from Kaggle:**
     * [**Link to Flickr8k Dataset on Kaggle**](https://www.kaggle.com/datasets/adityajn105/flickr8k)
-    * You will need a Kaggle account to download the files.
 
 2.  **Create a `data` folder** at the root of your project directory.
 
-3.  **Unzip and organize the files.** After downloading, you will have a zip file. Unzip it and place the contents into the `data` folder so that your directory structure looks like this:
+3.  **Unzip and organize the files** so that your directory structure looks like this:
 
     ```
     image-captioning-transformer/
     ├── data/
     │   ├── Images/
-    │   │   ├── 1000268201_693b08cb0e.jpg
-    │   │   └── ... (all other images)
+    │   │   └── ... (all .jpg files)
     │   └── captions.txt
     ├── src/
     │   └── ...
     └── README.md
     ```
-    *Make sure the `Images` folder and the `captions.txt` file are directly inside the `data` folder.*
 
 ---
 
 ## Usage
 
 ### Training
-To train the model from scratch, run the `train.py` script from the root directory.
+To train the model, run the `train.py` script from the root directory.
 
 ```bash
 python src/train.py --data_dir ./data --epochs 10 --batch_size 32
 ```
-Model weights will be saved to `weights.pt` and the vocabulary to `vocab.pkl` in the root directory.
 
 ### Prediction
-To generate a caption for a new image, use the `predict.py` script.
+Once the inference script is complete, you'll be able to run it like this:
 
 ```bash
+# Note: This is the target usage once predict.py is implemented
 python src/predict.py --image_path /path/to/your/image.jpg --weights_path weights.pt --vocab_path vocab.pkl
 ```
 
@@ -102,8 +93,8 @@ python src/predict.py --image_path /path/to/your/image.jpg --weights_path weight
 ## Model Architecture
 
 The model consists of two main components:
-1.  **Encoder:** An `EfficientNet-B0` model, pretrained on ImageNet, processes the input image and outputs a single feature vector. This vector is then projected into the Transformer's expected dimension (`model_dim`).
-2.  **Decoder:** A standard `nn.TransformerDecoder` takes the encoded image feature vector as its `memory` and the sequence of previously generated words as its `target` to predict the next word in the caption.
+1.  **Encoder:** An `EfficientNet-B0` model, pretrained on ImageNet, processes the input image and outputs a single feature vector.
+2.  **Decoder:** A standard `nn.TransformerDecoder` takes the encoded image feature vector as its `memory` and the sequence of previously generated words to predict the next word in the caption.
 
 ---
 
